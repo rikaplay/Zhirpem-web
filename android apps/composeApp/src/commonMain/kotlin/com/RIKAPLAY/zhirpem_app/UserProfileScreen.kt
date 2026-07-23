@@ -106,17 +106,17 @@ fun UserProfileScreen(
     
     LaunchedEffect(username) {
         db.collection("zhirpem_posts")
-            .whereEqualTo("handle", "@$username")
+            .where { "handle" equalTo "@$username" }
             .snapshots.collect { snap ->
-                posts = snap.documents.map { it.data<Post>().copy(id = it.id) }.sortedByDescending { it.timestamp }
+                posts = snap.documents.map { it.data<Post>().copy(id = it.id) }.sortedByDescending { it.timestamp?.seconds ?: 0L }
             }
     }
 
     LaunchedEffect(username) {
         db.collection("zhirpem_posts")
-            .whereArrayContains("repostedBy", username)
+            .where { "repostedBy" contains username }
             .snapshots.collect { snap ->
-                repostedPosts = snap.documents.map { it.data<Post>().copy(id = it.id) }.sortedByDescending { it.timestamp }
+                repostedPosts = snap.documents.map { it.data<Post>().copy(id = it.id) }.sortedByDescending { it.timestamp?.seconds ?: 0L }
                 isLoading = false
             }
     }
@@ -124,8 +124,8 @@ fun UserProfileScreen(
     LaunchedEffect(myUsername, username) {
         if (myUsername.isNotEmpty() && myUsername != username) {
             db.collection("follows")
-                .whereEqualTo("follower", myUsername)
-                .whereEqualTo("following", username)
+                .where { "follower" equalTo myUsername }
+                .where { "following" equalTo username }
                 .snapshots.collect { snapshot ->
                     isFollowing = snapshot.documents.isNotEmpty()
                 }
@@ -280,7 +280,7 @@ suspend fun openOrCreateChat(currentUserId: String, targetUserId: String, onChat
     val db = Firebase.firestore
     try {
         val snapshot = db.collection("chats")
-            .whereArrayContains("participants", currentUserId)
+            .where { "participants" contains currentUserId }
             .get()
         
         val existingChat = snapshot.documents.find { doc ->

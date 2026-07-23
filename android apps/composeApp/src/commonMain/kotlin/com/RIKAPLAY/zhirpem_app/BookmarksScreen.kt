@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.gitlive.firebase.Firebase
 import dev.gitlive.firebase.firestore.firestore
+import dev.gitlive.firebase.firestore.where
 import kotlinx.coroutines.flow.collect
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -29,9 +30,10 @@ fun BookmarksScreen(onBack: () -> Unit, onUserClick: (String) -> Unit) {
     LaunchedEffect(myUsername) {
         if (myUsername.isNotEmpty()) {
             db.collection("zhirpem_posts")
-                .whereArrayContains("bookmarkedBy", myUsername)
+                .where("bookmarkedBy", arrayContains = myUsername)
                 .snapshots.collect { snapshot ->
-                    bookmarkedPosts = snapshot.documents.map { it.data<Post>().copy(id = it.id) }.sortedByDescending { it.timestamp }
+                    bookmarkedPosts = snapshot.documents.map { it.data<Post>().copy(id = it.id) }
+                        .sortedByDescending { it.timestamp?.seconds ?: 0L }
                     isLoading = false
                 }
         }

@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import dev.gitlive.firebase.Firebase
-import dev.gitlive.firebase.firestore.firestore
+import dev.gitlive.firebase.firestore.*
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
@@ -39,7 +39,7 @@ fun ChatsListScreen(onChatClick: (String) -> Unit) {
     LaunchedEffect(myUsername) {
         if (myUsername.isNotEmpty()) {
             db.collection("chats")
-                .whereArrayContains("participants", myUsername)
+                .where { "participants" contains myUsername }
                 .snapshots
                 .collect { snapshot ->
                     chats = snapshot.documents.map { it.data<Chat>().copy(id = it.id) }
@@ -151,8 +151,8 @@ fun NewChatDialog(onDismiss: () -> Unit, onChatClick: (String) -> Unit) {
         if (searchQuery.length >= 2) {
             try {
                 val snap = db.collection("users")
-                    .whereGreaterThanOrEqualTo("username", searchQuery.lowercase())
-                    .whereLessThanOrEqualTo("username", searchQuery.lowercase() + "\uf8ff")
+                    .where { "username" greaterThanOrEqualTo searchQuery.lowercase() }
+                    .where { "username" lessThanOrEqualTo searchQuery.lowercase() + "\uf8ff" }
                     .get()
                 users = snap.documents.mapNotNull { doc ->
                     val uname = doc.id

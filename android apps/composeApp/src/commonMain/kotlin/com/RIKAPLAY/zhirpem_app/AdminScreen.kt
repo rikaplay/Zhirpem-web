@@ -26,6 +26,30 @@ import dev.gitlive.firebase.firestore.firestore
 import dev.gitlive.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
 
+@Composable
+fun EditorButton(text: String, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+        modifier = Modifier.height(36.dp),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Text(text, fontSize = 12.sp)
+    }
+}
+
+@Composable
+fun RowScope.AdminTabButton(text: String, isSelected: Boolean, onClick: () -> Unit) {
+    Button(
+        onClick = onClick, 
+        modifier = Modifier.weight(1f),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    ) { Text(text, fontSize = 12.sp) }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminPanelScreen(onBack: () -> Unit) {
@@ -56,49 +80,36 @@ fun AdminPanelScreen(onBack: () -> Unit) {
     }
 
     Scaffold(
-        containerColor = Color.Transparent,
         topBar = {
-            GlassTopBar(
-                isGlassEnabled = LocalGlassEnabled.current,
-                title = { Text("Админ-панель 🛠️") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Назад")
-                    }
-                }
+            TopAppBar(
+                title = { Text("Панель управления", fontWeight = FontWeight.Bold) },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null) } }
             )
         }
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp)
-        ) {
-            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 AdminTabButton("Юзеры", currentTab == "Users") { currentTab = "Users" }
-                Spacer(modifier = Modifier.width(4.dp))
                 AdminTabButton("Посты", currentTab == "Posts") { currentTab = "Posts" }
-                Spacer(modifier = Modifier.width(4.dp))
-                AdminTabButton("Пуши", currentTab == "Notifications") { currentTab = "Notifications" }
+                AdminTabButton("Уведомл.", currentTab == "Notifications") { currentTab = "Notifications" }
             }
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             if (isLoading) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             } else {
                 when (currentTab) {
                     "Users" -> {
-                        FastUserAssigner(db)
-                        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            items(users) { user ->
-                                UserAdminItem(user, db) { 
-                                    scope.launch {
-                                        val result = db.collection("users").get()
-                                        users = result.documents.map { it.data<Map<String, Any>>() + ("id" to it.id) }
+                        Column {
+                            FastUserAssigner(db)
+                            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                items(users) { user ->
+                                    UserAdminItem(user, db) { 
+                                        scope.launch {
+                                            val result = db.collection("users").get()
+                                            users = result.documents.map { it.data<Map<String, Any>>() + ("id" to it.id) }
+                                        }
                                     }
                                 }
                             }
@@ -123,18 +134,6 @@ fun AdminPanelScreen(onBack: () -> Unit) {
             }
         }
     }
-}
-
-@Composable
-fun AdminTabButton(text: String, isSelected: Boolean, onClick: () -> Unit) {
-    Button(
-        onClick = onClick, 
-        modifier = Modifier.weight(1f),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-            contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    ) { Text(text, fontSize = 12.sp) }
 }
 
 @Composable
@@ -293,47 +292,28 @@ fun NotificationAdminTab(db: FirebaseFirestore) {
         OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Заголовок") }, modifier = Modifier.fillMaxWidth())
         
         Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            EditorButton("B") { htmlBody += "<b></b>" }
-            EditorButton("I") { htmlBody += "<i></i>" }
-            EditorButton("Link") { htmlBody += "<a href='URL'>Текст</a>" }
-            // Media picker not integrated here yet for commonMain
+            EditorButton("Жирный") { htmlBody += "<b></b>" }
+            EditorButton("Курсив") { htmlBody += "<i></i>" }
+            EditorButton("Ссылка") { htmlBody += "<a href='URL'>Текст</a>" }
         }
 
         OutlinedTextField(value = htmlBody, onValueChange = { htmlBody = it }, label = { Text("Текст (HTML)") }, modifier = Modifier.fillMaxWidth().height(150.dp))
         OutlinedTextField(value = imageUrl, onValueChange = { imageUrl = it }, label = { Text("URL картинки") }, modifier = Modifier.fillMaxWidth())
-
+        
         Spacer(modifier = Modifier.height(16.dp))
-        Text("Предпросмотр:")
-        Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(title, fontWeight = FontWeight.Bold)
-                HtmlText(html = htmlBody)
-            }
-        }
 
         Button(
             onClick = {
                 if (title.isNotEmpty() && htmlBody.isNotEmpty()) {
                     isSending = true
                     scope.launch {
-                        val notificationData = mapOf(
-                            "title" to title,
-                            "htmlBody" to htmlBody,
-                            "bigPictureUrl" to imageUrl,
-                            "timestamp" to dev.gitlive.firebase.firestore.FieldValue.serverTimestamp,
-                            "type" to "ADMIN",
-                            "receiverId" to "ALL",
-                            "senderName" to "Zhirpem"
-                        )
-                        db.collection("notifications").add(notificationData)
                         val success = NotificationSender().sendGlobalPush(title, htmlBody, imageUrl)
-                        isSending = false
                         if (success) {
-                            showToast("Отправлено!")
-                            title = ""; htmlBody = ""; imageUrl = ""
-                        } else {
-                            showToast("Ошибка пуша")
+                            title = ""
+                            htmlBody = ""
+                            imageUrl = ""
                         }
+                        isSending = false
                     }
                 }
             },
@@ -346,9 +326,12 @@ fun NotificationAdminTab(db: FirebaseFirestore) {
     }
 }
 
-suspend fun updateBadge(db: FirebaseFirestore, userId: String, blue: Boolean, yellow: Boolean) {
-    db.collection("users").document(userId).update(
-        "blueBadge" to blue,
-        "yellowBadge" to yellow
-    )
+private suspend fun updateBadge(db: FirebaseFirestore, userId: String, blue: Boolean, yellow: Boolean) {
+    db.collection("users").document(userId).update("blueBadge" to blue, "yellowBadge" to yellow)
+    
+    // Also update all user's posts
+    val posts = db.collection("zhirpem_posts").where { "author" equalTo userId }.get()
+    posts.documents.forEach { doc ->
+        doc.reference.update("blueBadge" to blue, "yellowBadge" to yellow)
+    }
 }

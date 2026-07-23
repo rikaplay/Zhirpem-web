@@ -14,9 +14,15 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.shape.RoundedCornerShape
 import com.RIKAPLAY.zhirpem_app.platform.PushManager
 import dev.gitlive.firebase.Firebase
-import dev.gitlive.firebase.firestore.firestore
+import dev.gitlive.firebase.firestore.*
+import dev.gitlive.firebase.auth.auth
+import dev.gitlive.firebase.firestore.where
+import dev.gitlive.firebase.auth.auth
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 import zhirpem_app.composeapp.generated.resources.Res
