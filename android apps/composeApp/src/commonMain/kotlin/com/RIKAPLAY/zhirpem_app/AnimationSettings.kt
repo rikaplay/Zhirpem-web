@@ -14,7 +14,7 @@ val LocalGlassEnabled = compositionLocalOf { true }
 val LocalGlassAlpha = compositionLocalOf { 0.4f }
 val LocalBackgroundBlurEnabled = compositionLocalOf { true }
 
-expect class SettingsManager {
+expect class SettingsManager() {
     var isLowPerformanceMode: Boolean
     var fontSizeMultiplier: Float
     var isGlassEnabled: Boolean

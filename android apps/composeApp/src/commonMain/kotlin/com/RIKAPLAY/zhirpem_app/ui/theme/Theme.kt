@@ -75,18 +75,6 @@ private fun animateColorScheme(targetColorScheme: ColorScheme): ColorScheme {
         surfaceContainerHighest = animateColorAsState(targetColorScheme.surfaceContainerHighest, animationSpec, label = "surfaceContainerHighest").value,
         surfaceContainerLow = animateColorAsState(targetColorScheme.surfaceContainerLow, animationSpec, label = "surfaceContainerLow").value,
         surfaceContainerLowest = animateColorAsState(targetColorScheme.surfaceContainerLowest, animationSpec, label = "surfaceContainerLowest").value,
-        primaryFixed = animateColorAsState(targetColorScheme.primaryFixed, animationSpec, label = "primaryFixed").value,
-        onPrimaryFixed = animateColorAsState(targetColorScheme.onPrimaryFixed, animationSpec, label = "onPrimaryFixed").value,
-        primaryFixedDim = animateColorAsState(targetColorScheme.primaryFixedDim, animationSpec, label = "primaryFixedDim").value,
-        onPrimaryFixedVariant = animateColorAsState(targetColorScheme.onPrimaryFixedVariant, animationSpec, label = "onPrimaryFixedVariant").value,
-        secondaryFixed = animateColorAsState(targetColorScheme.secondaryFixed, animationSpec, label = "secondaryFixed").value,
-        onSecondaryFixed = animateColorAsState(targetColorScheme.onSecondaryFixed, animationSpec, label = "onSecondaryFixed").value,
-        secondaryFixedDim = animateColorAsState(targetColorScheme.secondaryFixedDim, animationSpec, label = "secondaryFixedDim").value,
-        onSecondaryFixedVariant = animateColorAsState(targetColorScheme.onSecondaryFixedVariant, animationSpec, label = "onSecondaryFixedVariant").value,
-        tertiaryFixed = animateColorAsState(targetColorScheme.tertiaryFixed, animationSpec, label = "tertiaryFixed").value,
-        onTertiaryFixed = animateColorAsState(targetColorScheme.onTertiaryFixed, animationSpec, label = "onTertiaryFixed").value,
-        tertiaryFixedDim = animateColorAsState(targetColorScheme.tertiaryFixedDim, animationSpec, label = "tertiaryFixedDim").value,
-        onTertiaryFixedVariant = animateColorAsState(targetColorScheme.onTertiaryFixedVariant, animationSpec, label = "onTertiaryFixedVariant").value,
     )
 }
 

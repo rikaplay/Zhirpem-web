@@ -1,5 +1,5 @@
 package com.RIKAPLAY.zhirpem_app.platform
 
-expect class NetworkMonitor {
+expect class NetworkMonitor() {
     suspend fun isActuallyConnected(): Boolean
 }

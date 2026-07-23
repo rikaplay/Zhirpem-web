@@ -5,7 +5,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 import com.RIKAPLAY.zhirpem_app.platform.parseColor
 
-expect class ThemeManager {
+expect class ThemeManager() {
     var themeType: String
     var customColor: String
     

@@ -56,6 +56,7 @@ kotlin {
                 implementation(compose.ui)
                 implementation(compose.components.resources)
                 implementation(compose.components.uiToolingPreview)
+                implementation(compose.materialIconsExtended)
                 implementation(libs.androidx.lifecycle.viewmodel)
                 implementation(libs.androidx.lifecycle.runtime.compose)
                 implementation(libs.jetbrains.compose.navigation)
@@ -63,15 +64,16 @@ kotlin {
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.serialization.json)
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
+
+                implementation(libs.firebase.firestore)
+                implementation(libs.firebase.auth)
+                implementation(libs.firebase.storage)
+                implementation(libs.firebase.database)
             }
         }
         val wasmJsMain by getting {
+            dependsOn(commonMain)
             dependencies {
-                implementation(compose.runtime)
-                implementation(compose.foundation)
-                implementation(compose.material3)
-                implementation(compose.ui)
-                implementation(libs.kotlinx.coroutines.core)
             }
         }
         val androidMain by getting {
@@ -100,11 +102,6 @@ kotlin {
                 implementation(libs.coil.gif)
                 implementation(libs.coil.network.okhttp)
                 implementation("com.squareup.okhttp3:okhttp:4.12.0")
-
-                implementation(libs.firebase.firestore)
-                implementation(libs.firebase.auth)
-                implementation(libs.firebase.storage)
-                implementation(libs.firebase.database)
             }
         }
         val iosX64Main by getting
@@ -116,10 +113,6 @@ kotlin {
             iosArm64Main.dependsOn(this)
             iosSimulatorArm64Main.dependsOn(this)
             dependencies {
-                implementation(libs.firebase.firestore)
-                implementation(libs.firebase.auth)
-                implementation(libs.firebase.storage)
-                implementation(libs.firebase.database)
             }
         }
     }
