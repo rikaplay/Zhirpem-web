@@ -19,7 +19,7 @@ kotlin {
     }
     
     js(IR) {
-        moduleName = "composeApp"
+        outputModuleName.set("composeApp")
         browser {
             commonWebpackConfig {
                 outputFileName = "composeApp.js"
