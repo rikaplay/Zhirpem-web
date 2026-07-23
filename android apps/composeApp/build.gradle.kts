@@ -18,19 +18,11 @@ kotlin {
         }
     }
     
-    @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
-    wasmJs {
-        outputModuleName.set("composeApp")
+    js(IR) {
+        moduleName = "composeApp"
         browser {
-            val rootDirPath = project.rootDir.path
-            val projectDirPath = project.projectDir.path
             commonWebpackConfig {
                 outputFileName = "composeApp.js"
-                devServer = (devServer ?: org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackConfig.DevServer()).apply {
-                    static = (static ?: mutableListOf()).apply {
-                        add(rootDirPath)
-                    }
-                }
             }
         }
         binaries.executable()
@@ -71,9 +63,10 @@ kotlin {
                 implementation(libs.firebase.database)
             }
         }
-        val wasmJsMain by getting {
+        val jsMain by getting {
             dependsOn(commonMain)
             dependencies {
+                implementation(compose.html.core)
             }
         }
         val androidMain by getting {
