@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
+import { missingFirebaseEnv } from '@/lib/firebase';
 
 interface AuthScreenProps {
   onSuccess: (userData: any) => void;
@@ -44,7 +45,17 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSuccess }) => {
         setError('Пользователь не найден');
       }
     } catch (err: any) {
-      setError('Ошибка сети или ключей Firebase');
+      console.error('Вход: ошибка Firebase', err);
+      if (missingFirebaseEnv.length > 0) {
+        // Самая частая причина на Vercel: переменные не заданы или после их добавления не сделан Redeploy
+        setError(`Не заданы переменные Firebase в Vercel: ${missingFirebaseEnv.join(', ')}`);
+      } else if (err?.code === 'permission-denied') {
+        setError('Firebase отказал в доступе: проверьте правила Firestore (код permission-denied)');
+      } else if (err?.code === 'unavailable') {
+        setError('Нет связи с Firebase: проверьте интернет (код unavailable)');
+      } else {
+        setError(`Ошибка Firebase: ${err?.code || err?.message || 'неизвестная'}`);
+      }
       console.error(err);
     } finally {
       setLoading(false);
