@@ -1,0 +1,236 @@
+package com.RIKAPLAY.zhirpem_app.webrtc
+
+import android.content.Context
+import android.util.Log
+import org.webrtc.*
+import org.webrtc.audio.JavaAudioDeviceModule
+
+class WebRtcManager(
+    private val context: Context,
+    private val signalingClient: SignalingClient
+) {
+    private val rootEglBase: EglBase = EglBase.create()
+    private var peerConnectionFactory: PeerConnectionFactory? = null
+    private var peerConnection: PeerConnection? = null
+    private var videoCapturer: VideoCapturer? = null
+    private var localVideoTrack: VideoTrack? = null
+    private var localAudioTrack: AudioTrack? = null
+
+    private val iceServers = listOf(
+        PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer(),
+        PeerConnection.IceServer.builder("stun:stun1.l.google.com:19302").createIceServer(),
+        PeerConnection.IceServer.builder("stun:stun2.l.google.com:19302").createIceServer(),
+        PeerConnection.IceServer.builder("stun:stun3.l.google.com:19302").createIceServer(),
+        PeerConnection.IceServer.builder("stun:stun4.l.google.com:19302").createIceServer(),
+        // TURN-реле: без него звонки не проходят через мобильные сети и строгие NAT.
+        // Это бесплатный публичный сервер, для стабильной работы лучше поднять свой.
+        PeerConnection.IceServer.builder("turn:openrelay.metered.ca:80")
+            .setUsername("openrelayproject").setPassword("openrelayproject").createIceServer(),
+        PeerConnection.IceServer.builder("turn:openrelay.metered.ca:443")
+            .setUsername("openrelayproject").setPassword("openrelayproject").createIceServer(),
+        PeerConnection.IceServer.builder("turn:openrelay.metered.ca:443?transport=tcp")
+            .setUsername("openrelayproject").setPassword("openrelayproject").createIceServer()
+    )
+
+    // Кандидаты, пришедшие раньше, чем установлено удалённое описание, нельзя добавлять сразу:
+    // WebRTC их молча отбрасывает. Поэтому копим и добавляем после setRemoteDescription.
+    private val pendingCandidates = mutableListOf<IceCandidate>()
+    private var remoteDescriptionSet = false
+
+    init {
+        initPeerConnectionFactory()
+    }
+
+    @Synchronized
+    private fun initPeerConnectionFactory() {
+        if (peerConnectionFactory != null) return
+
+        val options = PeerConnectionFactory.InitializationOptions.builder(context)
+            .setEnableInternalTracer(true)
+            .setFieldTrials("WebRTC-H264HighProfile/Enabled/")
+            .createInitializationOptions()
+        
+        try { PeerConnectionFactory.initialize(options) } catch (e: Exception) {}
+
+        val encoderFactory = DefaultVideoEncoderFactory(rootEglBase.eglBaseContext, true, true)
+        val decoderFactory = DefaultVideoDecoderFactory(rootEglBase.eglBaseContext)
+        val audioDeviceModule = JavaAudioDeviceModule.builder(context)
+            .setUseHardwareAcousticEchoCanceler(true)
+            .setUseHardwareNoiseSuppressor(true)
+            .createAudioDeviceModule()
+
+        peerConnectionFactory = PeerConnectionFactory.builder()
+            .setVideoEncoderFactory(encoderFactory)
+            .setVideoDecoderFactory(decoderFactory)
+            .setAudioDeviceModule(audioDeviceModule)
+            .setOptions(PeerConnectionFactory.Options())
+            .createPeerConnectionFactory()
+    }
+
+    fun initLocalSurface(renderer: SurfaceViewRenderer) {
+        renderer.init(rootEglBase.eglBaseContext, null)
+        renderer.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FILL)
+        renderer.setMirror(true)
+    }
+
+    fun initRemoteSurface(renderer: SurfaceViewRenderer) {
+        renderer.init(rootEglBase.eglBaseContext, null)
+        renderer.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FILL)
+    }
+
+    fun getLocalVideoTrack(): VideoTrack? = localVideoTrack
+
+    /**
+     * Создаёт локальные дорожки. Микрофон нужен всегда (раньше в аудиозвонке его не было вообще),
+     * камера только для видеозвонка и только если есть разрешение.
+     */
+    fun startLocalCapture(withVideo: Boolean = true) {
+        initPeerConnectionFactory()
+
+        if (localAudioTrack == null) {
+            localAudioTrack = peerConnectionFactory?.createAudioTrack(
+                "AUDIO_TRACK",
+                peerConnectionFactory?.createAudioSource(MediaConstraints())
+            )
+        }
+
+        val hasCamera = androidx.core.content.ContextCompat.checkSelfPermission(
+            context, android.Manifest.permission.CAMERA
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+        if (withVideo && hasCamera && localVideoTrack == null) {
+            val videoSource = peerConnectionFactory?.createVideoSource(false)
+            val capturer = createVideoCapturer()
+            if (capturer != null && videoSource != null) {
+                videoCapturer = capturer
+                capturer.initialize(
+                    SurfaceTextureHelper.create("WebRtcCap", rootEglBase.eglBaseContext),
+                    context,
+                    videoSource.capturerObserver
+                )
+                capturer.startCapture(1280, 720, 30)
+                localVideoTrack = peerConnectionFactory?.createVideoTrack("VIDEO_TRACK", videoSource)
+            }
+        }
+    }
+
+    fun addLocalSink(renderer: SurfaceViewRenderer) {
+        localVideoTrack?.addSink(renderer)
+    }
+
+    fun addRemoteSink(renderer: SurfaceViewRenderer) {
+        peerConnection?.receivers?.forEach { (it.track() as? VideoTrack)?.addSink(renderer) }
+    }
+
+    private fun createVideoCapturer(): VideoCapturer? {
+        val enumerator = Camera2Enumerator(context)
+        return enumerator.deviceNames.find { enumerator.isFrontFacing(it) }?.let { enumerator.createCapturer(it, null) }
+            ?: enumerator.deviceNames.firstOrNull()?.let { enumerator.createCapturer(it, null) }
+    }
+
+    fun createPeerConnection(observer: PeerConnection.Observer) {
+        initPeerConnectionFactory()
+        val rtcConfig = PeerConnection.RTCConfiguration(iceServers).apply {
+            sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN
+            continualGatheringPolicy = PeerConnection.ContinualGatheringPolicy.GATHER_CONTINUALLY
+        }
+        peerConnection = peerConnectionFactory?.createPeerConnection(rtcConfig, observer)
+        localVideoTrack?.let { peerConnection?.addTrack(it) }
+        localAudioTrack?.let { peerConnection?.addTrack(it) }
+    }
+
+    fun call(callType: String = "VIDEO") {
+        val constraints = MediaConstraints().apply {
+            mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveVideo", "true"))
+            mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"))
+        }
+        peerConnection?.createOffer(object : SdpObserverAdapter() {
+            override fun onCreateSuccess(desc: SessionDescription?) {
+                peerConnection?.setLocalDescription(object : SdpObserverAdapter() {
+                    override fun onSetSuccess() {
+                        desc?.let { signalingClient.sendOffer(it, callType) }
+                        setVideoBitrate(300, 2500)
+                    }
+                }, desc)
+            }
+        }, constraints)
+    }
+
+    fun answer() {
+        peerConnection?.createAnswer(object : SdpObserverAdapter() {
+            override fun onCreateSuccess(desc: SessionDescription?) {
+                peerConnection?.setLocalDescription(object : SdpObserverAdapter() {
+                    override fun onSetSuccess() {
+                        desc?.let { signalingClient.sendAnswer(it) }
+                        setVideoBitrate(300, 2500)
+                    }
+                }, desc)
+            }
+        }, MediaConstraints())
+    }
+
+    fun onRemoteSessionDescription(desc: SessionDescription) {
+        peerConnection?.setRemoteDescription(object : SdpObserverAdapter() {
+            override fun onSetSuccess() {
+                remoteDescriptionSet = true
+                synchronized(pendingCandidates) {
+                    pendingCandidates.forEach { peerConnection?.addIceCandidate(it) }
+                    pendingCandidates.clear()
+                }
+            }
+        }, desc)
+    }
+
+    fun addIceCandidate(candidate: IceCandidate) {
+        val pc = peerConnection
+        if (pc != null && remoteDescriptionSet) {
+            pc.addIceCandidate(candidate)
+        } else {
+            synchronized(pendingCandidates) { pendingCandidates.add(candidate) }
+        }
+    }
+
+    private fun setVideoBitrate(min: Int, max: Int) {
+        peerConnection?.senders?.filter { it.track()?.kind() == "video" }?.forEach { sender ->
+            sender.parameters = sender.parameters.apply { encodings.forEach { it.minBitrateBps = min * 1000; it.maxBitrateBps = max * 1000 } }
+        }
+    }
+
+    fun toggleVideo(en: Boolean) = localVideoTrack?.setEnabled(en)
+    fun toggleAudio(en: Boolean) = localAudioTrack?.setEnabled(en)
+
+    fun flipCamera(handler: CameraVideoCapturer.CameraSwitchHandler? = null) {
+        (videoCapturer as? CameraVideoCapturer)?.switchCamera(handler)
+    }
+
+    fun getStats(callback: (RTCStatsReport) -> Unit) {
+        peerConnection?.getStats { callback(it) }
+    }
+
+    fun dispose() {
+        remoteDescriptionSet = false
+        synchronized(pendingCandidates) { pendingCandidates.clear() }
+        try { videoCapturer?.stopCapture() } catch (_: Exception) {}
+        videoCapturer?.dispose()
+        videoCapturer = null
+        peerConnection?.close()
+        peerConnection?.dispose()
+        peerConnection = null
+        localVideoTrack = null
+        localAudioTrack = null
+    }
+
+    fun release() {
+        dispose()
+        peerConnectionFactory?.dispose()
+        peerConnectionFactory = null
+        rootEglBase.release()
+    }
+
+    open class SdpObserverAdapter : SdpObserver {
+        override fun onCreateSuccess(desc: SessionDescription?) {}
+        override fun onSetSuccess() {}
+        override fun onCreateFailure(e: String?) { Log.e("WebRtc", "SDP Create Fail: $e") }
+        override fun onSetFailure(e: String?) { Log.e("WebRtc", "SDP Set Fail: $e") }
+    }
+}
